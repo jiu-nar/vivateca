@@ -1,118 +1,182 @@
-// Main app logic: page list, page viewer, parse/index, and ask.
-
 (function () {
+  const $ = id => document.getElementById(id);
+
   const els = {
-    pageList: document.getElementById('page-list'),
-    pageTitle: document.getElementById('page-title'),
-    pageContent: document.getElementById('page-content'),
-    main: document.getElementById('main'),
-    signedOut: document.getElementById('signed-out'),
-    signedIn: document.getElementById('signed-in'),
+    pageList:       $('page-list'),
+    pageSearch:     $('page-search'),
+    pageTitle:      $('page-title'),
+    pageContent:    $('page-content'),
+    signedOut:      $('signed-out'),
+    signedIn:       $('signed-in'),
+    signoutBtn:     $('signout-btn'),
 
-    parseType: document.getElementById('parse-type'),
-    parseInput: document.getElementById('parse-input'),
-    parsePdfRow: document.getElementById('parse-pdf-row'),
-    pickPdfBtn: document.getElementById('pick-pdf-btn'),
-    pickPdfStatus: document.getElementById('pick-pdf-status'),
-    parseBtn: document.getElementById('parse-btn'),
-    parseStatus: document.getElementById('parse-status'),
-    parseResult: document.getElementById('parse-result'),
-    indexBtn: document.getElementById('index-btn'),
+    tabAskBtn:      $('tab-ask-btn'),
+    tabAddBtn:      $('tab-add-btn'),
+    drawerAsk:      $('drawer-ask'),
+    drawerAdd:      $('drawer-add'),
 
-    askInput: document.getElementById('ask-input'),
-    askBtn: document.getElementById('ask-btn'),
-    askStatus: document.getElementById('ask-status'),
-    askAnswer: document.getElementById('ask-answer'),
-    askSources: document.getElementById('ask-sources')
+    askInput:       $('ask-input'),
+    askBtn:         $('ask-btn'),
+    askStatus:      $('ask-status'),
+    askAnswer:      $('ask-answer'),
+    askSources:     $('ask-sources'),
+    askSourcesWrap: $('ask-sources-wrap'),
+
+    parsePdfRow:    $('parse-pdf-row'),
+    pickPdfBtn:     $('pick-pdf-btn'),
+    pickPdfStatus:  $('pick-pdf-status'),
+    parseInput:     $('parse-input'),
+    parseBtn:       $('parse-btn'),
+    parseStatus:    $('parse-status'),
+    parseResult:    $('parse-result'),
+    indexBtn:       $('index-btn')
   };
 
+  let allPages = [];
   let pendingRawId = null;
   let pickedPdfFileId = null;
+  let currentType = 'url';
+  let activePageEl = null;
 
+  // ── Auth ──
   function onSignIn() {
     els.signedOut.style.display = 'none';
     els.signedIn.style.display = 'block';
     refreshPageList();
   }
 
+  els.signoutBtn.addEventListener('click', () => LLMWikiAuth.signOut());
+
+  // ── Drawers ──
+  function openDrawer(which) {
+    const askActive = which === 'ask';
+    els.drawerAsk.style.display = askActive ? 'block' : 'none';
+    els.drawerAdd.style.display = askActive ? 'none' : 'block';
+    els.tabAskBtn.classList.toggle('active', askActive);
+    els.tabAddBtn.classList.toggle('active', !askActive);
+  }
+
+  function closeDrawers() {
+    els.drawerAsk.style.display = 'none';
+    els.drawerAdd.style.display = 'none';
+    els.tabAskBtn.classList.remove('active');
+    els.tabAddBtn.classList.remove('active');
+  }
+
+  els.tabAskBtn.addEventListener('click', () => {
+    els.drawerAsk.style.display === 'none' ? openDrawer('ask') : closeDrawers();
+  });
+  els.tabAddBtn.addEventListener('click', () => {
+    els.drawerAdd.style.display === 'none' ? openDrawer('add') : closeDrawers();
+  });
+
+  document.querySelectorAll('.close-drawer').forEach(btn => {
+    btn.addEventListener('click', closeDrawers);
+  });
+
+  // ── Page List ──
   async function refreshPageList() {
-    els.pageList.innerHTML = '<li class="muted">로딩 중...</li>';
+    els.pageList.innerHTML = '<li><span class="empty-msg">로딩 중…</span></li>';
     try {
       const data = await LLMWikiApi.listPages();
-      renderPageList(data.pages || []);
+      allPages = data.pages || [];
+      renderPageList(allPages);
     } catch (err) {
-      els.pageList.innerHTML = '<li class="error">' + escapeHtml(err.message) + '</li>';
+      els.pageList.innerHTML = '<li><span class="error-msg">' + escHtml(err.message) + '</span></li>';
     }
   }
 
   function renderPageList(pages) {
-    if (pages.length === 0) {
-      els.pageList.innerHTML = '<li class="muted">아직 페이지가 없습니다.</li>';
+    if (!pages.length) {
+      els.pageList.innerHTML = '<li><span class="empty-msg">아직 페이지가 없습니다.</span></li>';
       return;
     }
     els.pageList.innerHTML = '';
-    pages
-      .sort(function (a, b) { return a.title.localeCompare(b.title); })
-      .forEach(function (page) {
+    [...pages]
+      .sort((a, b) => a.title.localeCompare(b.title))
+      .forEach(page => {
         const li = document.createElement('li');
         const a = document.createElement('a');
         a.href = '#';
-        a.textContent = page.title;
         a.title = page.summary || '';
-        a.addEventListener('click', function (e) {
-          e.preventDefault();
-          openPage(page);
-        });
+        const typeEmoji = typeToEmoji(page.type);
+        a.innerHTML = typeEmoji + ' ' + escHtml(page.title) +
+          (page.type ? '<span class="page-type-badge">' + escHtml(page.type) + '</span>' : '');
+        a.addEventListener('click', e => { e.preventDefault(); openPage(page, a); });
         li.appendChild(a);
         els.pageList.appendChild(li);
       });
   }
 
-  async function openPage(page) {
+  // ── Search ──
+  els.pageSearch.addEventListener('input', function () {
+    const q = this.value.trim().toLowerCase();
+    const filtered = q
+      ? allPages.filter(p => p.title.toLowerCase().includes(q) || (p.tags || []).some(t => t.toLowerCase().includes(q)))
+      : allPages;
+    renderPageList(filtered);
+  });
+
+  // ── Page View ──
+  async function openPage(page, linkEl) {
+    if (activePageEl) activePageEl.classList.remove('active');
+    activePageEl = linkEl;
+    if (linkEl) linkEl.classList.add('active');
+
     els.pageTitle.textContent = page.title;
-    els.pageContent.innerHTML = '로딩 중...';
+    els.pageContent.innerHTML = '<p style="color:var(--text-muted);font-size:14px;">로딩 중…</p>';
+
     try {
       const data = await LLMWikiApi.getPage(page.id);
-      els.pageContent.innerHTML = marked.parse(data.content);
+      const content = stripFrontmatter(data.content);
+      let html = '';
+      if (page.type) {
+        html += '<span class="fm-badge">' + escHtml(page.type) + '</span>';
+      }
+      html += marked.parse(content);
+      els.pageContent.innerHTML = html;
     } catch (err) {
-      els.pageContent.innerHTML = '<p class="error">' + escapeHtml(err.message) + '</p>';
+      els.pageContent.innerHTML = '<p style="color:var(--danger)">' + escHtml(err.message) + '</p>';
     }
   }
 
-  // --- Parse / Index ---
+  function stripFrontmatter(text) {
+    if (!text.startsWith('---')) return text;
+    const end = text.indexOf('\n---', 3);
+    return end !== -1 ? text.slice(end + 4).trimStart() : text;
+  }
 
-  els.parseType.addEventListener('change', function () {
-    const type = els.parseType.value;
-    els.parsePdfRow.style.display = type === 'pdf' ? 'flex' : 'none';
-    els.parseInput.style.display = type === 'pdf' ? 'none' : 'block';
-    els.parseInput.placeholder =
-      type === 'url' ? '웹페이지 URL을 입력하세요' :
-      type === 'youtube' ? 'YouTube 영상 URL을 입력하세요' :
-      '텍스트 또는 마크다운 내용을 입력하세요';
+  // ── Type Tabs ──
+  document.querySelectorAll('.type-tab').forEach(btn => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.type-tab').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentType = this.dataset.type;
+
+      const isPdf = currentType === 'pdf';
+      els.parsePdfRow.style.display = isPdf ? 'flex' : 'none';
+      els.parseInput.style.display = isPdf ? 'none' : 'block';
+      els.parseInput.placeholder =
+        currentType === 'url'     ? '웹페이지 URL을 입력하세요…' :
+        currentType === 'youtube' ? 'YouTube 링크를 입력하세요…' :
+                                    '텍스트 또는 마크다운을 입력하세요…';
+    });
   });
 
-  els.pickPdfBtn.addEventListener('click', openPdfPicker);
+  // ── Parse ──
+  els.parseBtn.addEventListener('click', async () => {
+    const payload = { type: currentType };
 
-  els.parseBtn.addEventListener('click', async function () {
-    const type = els.parseType.value;
-    const payload = { type: type };
-
-    if (type === 'pdf') {
-      if (!pickedPdfFileId) {
-        setStatus(els.parseStatus, 'PDF 파일을 먼저 선택하세요.', true);
-        return;
-      }
+    if (currentType === 'pdf') {
+      if (!pickedPdfFileId) { setStatus(els.parseStatus, 'PDF 파일을 먼저 선택하세요.', 'error'); return; }
       payload.fileId = pickedPdfFileId;
     } else {
-      const value = els.parseInput.value.trim();
-      if (!value) {
-        setStatus(els.parseStatus, '내용을 입력하세요.', true);
-        return;
-      }
-      payload.payload = value;
+      const val = els.parseInput.value.trim();
+      if (!val) { setStatus(els.parseStatus, '내용을 입력하세요.', 'error'); return; }
+      payload.payload = val;
     }
 
-    setStatus(els.parseStatus, '파싱 중... (최대 몇 분 소요)');
+    setStatus(els.parseStatus, '파싱 중… (잠시 기다려 주세요)');
     els.parseResult.style.display = 'none';
     els.indexBtn.disabled = true;
     pendingRawId = null;
@@ -121,26 +185,27 @@
       const result = await LLMWikiApi.parse(payload);
       pendingRawId = result.rawId;
       els.parseResult.style.display = 'block';
-      els.parseResult.querySelector('.preview-title').textContent = result.title;
+      els.parseResult.querySelector('.preview-title-text').textContent = result.title;
       els.parseResult.querySelector('.preview-body').textContent = result.preview;
       els.indexBtn.disabled = false;
-      setStatus(els.parseStatus, '파싱 완료. 아래 내용을 확인하고 위키에 추가하세요.');
+      setStatus(els.parseStatus, '파싱 완료. 내용을 확인하고 위키에 추가하세요.', 'success');
     } catch (err) {
-      setStatus(els.parseStatus, '오류: ' + err.message, true);
+      setStatus(els.parseStatus, '오류: ' + err.message, 'error');
     }
   });
 
-  els.indexBtn.addEventListener('click', async function () {
+  // ── Index ──
+  els.indexBtn.addEventListener('click', async () => {
     if (!pendingRawId) return;
     els.indexBtn.disabled = true;
-    setStatus(els.parseStatus, '색인 중... (최대 몇 분 소요)');
+    setStatus(els.parseStatus, '위키에 추가 중…');
 
     try {
       const result = await LLMWikiApi.index({ rawId: pendingRawId });
-      const summary = result.pages.map(function (p) {
-        return p.title + ' (' + (p.action === 'create' ? '신규' : '갱신') + ')';
-      }).join(', ');
-      setStatus(els.parseStatus, '완료: ' + summary);
+      const summary = result.pages.map(p =>
+        p.title + (p.action === 'create' ? ' 신규' : ' 갱신')
+      ).join(', ');
+      setStatus(els.parseStatus, '완료: ' + summary, 'success');
       els.parseResult.style.display = 'none';
       els.parseInput.value = '';
       pendingRawId = null;
@@ -148,90 +213,90 @@
       els.pickPdfStatus.textContent = '';
       refreshPageList();
     } catch (err) {
-      setStatus(els.parseStatus, '오류: ' + err.message, true);
+      setStatus(els.parseStatus, '오류: ' + err.message, 'error');
       els.indexBtn.disabled = false;
     }
   });
 
-  // --- Ask ---
-
-  els.askBtn.addEventListener('click', async function () {
+  // ── Ask ──
+  els.askBtn.addEventListener('click', async () => {
     const question = els.askInput.value.trim();
     if (!question) return;
 
-    setStatus(els.askStatus, '답변 생성 중... (최대 몇 분 소요)');
-    els.askAnswer.textContent = '';
-    els.askSources.innerHTML = '';
+    setStatus(els.askStatus, '답변 생성 중…');
+    els.askAnswer.innerHTML = '';
+    els.askSourcesWrap.style.display = 'none';
 
     try {
-      const result = await LLMWikiApi.ask({ question: question });
+      const result = await LLMWikiApi.ask({ question });
       els.askAnswer.innerHTML = marked.parse(result.answer);
-      result.sources.forEach(function (src) {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = '#';
-        a.textContent = src.title;
-        a.addEventListener('click', function (e) {
-          e.preventDefault();
-          const page = (window.__llmWikiIndexCache || []).find(function (p) { return p.path === src.path; });
-          if (page) openPage(page);
+      if (result.sources && result.sources.length) {
+        els.askSources.innerHTML = '';
+        result.sources.forEach(src => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = '#';
+          a.textContent = src.title;
+          a.addEventListener('click', e => {
+            e.preventDefault();
+            const page = allPages.find(p => p.path === src.path);
+            if (page) openPage(page, null);
+          });
+          li.appendChild(a);
+          els.askSources.appendChild(li);
         });
-        li.appendChild(a);
-        els.askSources.appendChild(li);
-      });
+        els.askSourcesWrap.style.display = 'block';
+      }
       setStatus(els.askStatus, '');
     } catch (err) {
-      setStatus(els.askStatus, '오류: ' + err.message, true);
+      setStatus(els.askStatus, '오류: ' + err.message, 'error');
     }
   });
 
-  // --- Google Picker (PDF upload to Drive) ---
+  els.askInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) els.askBtn.click();
+  });
+
+  // ── PDF Picker ──
+  els.pickPdfBtn.addEventListener('click', openPdfPicker);
 
   function openPdfPicker() {
-    gapi.load('picker', function () {
-      LLMWikiAuth.getAccessToken().then(function (accessToken) {
-        const uploadView = new google.picker.DocsUploadView()
-          .setParent(window.LLM_WIKI_CONFIG.DRIVE_ROOT_FOLDER_ID);
-
+    gapi.load('picker', () => {
+      LLMWikiAuth.getAccessToken().then(token => {
         const picker = new google.picker.PickerBuilder()
-          .addView(uploadView)
-          .addView(new google.picker.DocsView(google.picker.ViewId.PDFS).setParent(window.LLM_WIKI_CONFIG.DRIVE_ROOT_FOLDER_ID))
-          .setOAuthToken(accessToken)
-          .setDeveloperKey(window.LLM_WIKI_CONFIG.GOOGLE_API_KEY)
-          .setCallback(function (data) {
+          .addView(new google.picker.DocsUploadView().setParent(LLM_WIKI_CONFIG.DRIVE_ROOT_FOLDER_ID))
+          .addView(new google.picker.DocsView(google.picker.ViewId.PDFS).setParent(LLM_WIKI_CONFIG.DRIVE_ROOT_FOLDER_ID))
+          .setOAuthToken(token)
+          .setDeveloperKey(LLM_WIKI_CONFIG.GOOGLE_API_KEY)
+          .setCallback(data => {
             if (data.action === google.picker.Action.PICKED) {
-              const doc = data.docs[0];
-              pickedPdfFileId = doc.id;
-              els.pickPdfStatus.textContent = '선택됨: ' + doc.name;
+              pickedPdfFileId = data.docs[0].id;
+              els.pickPdfStatus.textContent = '선택됨: ' + data.docs[0].name;
             }
           })
           .build();
         picker.setVisible(true);
-      }).catch(function (err) {
+      }).catch(err => {
         els.pickPdfStatus.textContent = '인증 오류: ' + (err.error || err.message || err);
       });
     });
   }
 
-  // --- Helpers ---
-
-  function setStatus(el, text, isError) {
+  // ── Helpers ──
+  function setStatus(el, text, type) {
     el.textContent = text;
-    el.className = 'status' + (isError ? ' error' : '');
+    el.className = 'status-msg' + (type ? ' ' + type : '');
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+  function escHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
   }
 
-  // Keep a cache of page list for source link navigation in ask results.
-  const originalRender = renderPageList;
-  renderPageList = function (pages) {
-    window.__llmWikiIndexCache = pages;
-    originalRender(pages);
-  };
+  function typeToEmoji(type) {
+    return { Concept: '💡', Summary: '📝', 'How-to': '🔧', Reference: '📌', Note: '🗒️' }[type] || '📄';
+  }
 
   LLMWikiAuth.init(onSignIn);
 })();

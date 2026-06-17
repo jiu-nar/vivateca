@@ -4,65 +4,113 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LLM Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://accounts.google.com/gsi/client"></script>
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-  <header>
-    <h1>LLM Wiki</h1>
-    <div id="google-signin-button"></div>
-  </header>
-
-  <div id="signed-out" class="centered">
-    <p>로그인하여 위키에 접근하세요.</p>
+  <!-- Sign-out screen -->
+  <div id="signed-out" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">📖</div>
+      <h1>LLM Wiki</h1>
+      <p>나만의 AI 지식 베이스</p>
+      <div id="google-signin-button"></div>
+    </div>
   </div>
 
-  <div id="signed-in" style="display: none;">
-    <div class="layout">
-      <aside id="sidebar">
-        <h2>페이지</h2>
-        <ul id="page-list"></ul>
+  <!-- Main app -->
+  <div id="signed-in" style="display:none;">
+    <div class="app-layout">
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title">📖 LLM Wiki</span>
+          <button class="icon-btn" id="signout-btn" title="로그아웃">↩</button>
+        </div>
+        <div class="sidebar-search">
+          <input type="text" id="page-search" placeholder="페이지 검색…" />
+        </div>
+        <nav class="page-nav">
+          <ul id="page-list"></ul>
+        </nav>
       </aside>
 
-      <main id="main">
-        <section id="page-view">
-          <h2 id="page-title">페이지를 선택하세요</h2>
+      <!-- Content -->
+      <div class="content-area">
+
+        <!-- Top bar -->
+        <div class="topbar">
+          <span id="page-title" class="topbar-title">페이지를 선택하세요</span>
+          <div class="topbar-actions">
+            <button class="tab-trigger" id="tab-ask-btn">💬 질문</button>
+            <button class="tab-trigger" id="tab-add-btn">＋ 추가</button>
+          </div>
+        </div>
+
+        <!-- Page view -->
+        <article class="page-view">
           <div id="page-content" class="markdown-body"></div>
-        </section>
+        </article>
 
-        <section id="ask-panel" class="panel">
-          <h3>질문하기</h3>
-          <textarea id="ask-input" rows="2" placeholder="위키 내용에 대해 질문하세요"></textarea>
-          <button id="ask-btn">질문</button>
-          <p id="ask-status" class="status"></p>
-          <div id="ask-answer" class="markdown-body"></div>
-          <ul id="ask-sources"></ul>
-        </section>
+        <!-- Bottom drawer: Ask -->
+        <div class="drawer" id="drawer-ask" style="display:none;">
+          <div class="drawer-header">
+            <span>💬 질문하기</span>
+            <button class="icon-btn close-drawer">✕</button>
+          </div>
+          <div class="drawer-body">
+            <div class="input-row">
+              <textarea id="ask-input" rows="2" placeholder="위키 내용에 대해 질문하세요…"></textarea>
+              <button id="ask-btn" class="primary-btn">질문</button>
+            </div>
+            <p id="ask-status" class="status-msg"></p>
+            <div id="ask-answer" class="markdown-body answer-body"></div>
+            <div id="ask-sources-wrap" style="display:none;">
+              <p class="sources-label">참고 페이지</p>
+              <ul id="ask-sources"></ul>
+            </div>
+          </div>
+        </div>
 
-        <section id="parse-panel" class="panel">
-          <h3>콘텐츠 추가</h3>
-          <select id="parse-type">
-            <option value="url">웹페이지 링크</option>
-            <option value="youtube">YouTube 링크</option>
-            <option value="text">텍스트 / 마크다운</option>
-            <option value="pdf">PDF 파일</option>
-          </select>
-          <textarea id="parse-input" rows="3" placeholder="웹페이지 URL을 입력하세요"></textarea>
-          <div id="parse-pdf-row" style="display: none;" class="row">
-            <button id="pick-pdf-btn">Drive에서 PDF 선택/업로드</button>
-            <span id="pick-pdf-status" class="status"></span>
+        <!-- Bottom drawer: Add -->
+        <div class="drawer" id="drawer-add" style="display:none;">
+          <div class="drawer-header">
+            <span>＋ 콘텐츠 추가</span>
+            <button class="icon-btn close-drawer">✕</button>
           </div>
-          <button id="parse-btn">파싱</button>
-          <p id="parse-status" class="status"></p>
-          <div id="parse-result" style="display: none;" class="preview">
-            <h4 class="preview-title"></h4>
-            <pre class="preview-body"></pre>
-            <button id="index-btn" disabled>위키에 추가</button>
+          <div class="drawer-body">
+            <div class="type-tabs">
+              <button class="type-tab active" data-type="url">🌐 웹페이지</button>
+              <button class="type-tab" data-type="youtube">▶ YouTube</button>
+              <button class="type-tab" data-type="text">📝 텍스트</button>
+              <button class="type-tab" data-type="pdf">📄 PDF</button>
+            </div>
+            <div class="input-row">
+              <textarea id="parse-input" rows="2" placeholder="웹페이지 URL을 입력하세요…"></textarea>
+              <button id="parse-btn" class="primary-btn">파싱</button>
+            </div>
+            <div id="parse-pdf-row" style="display:none;" class="pdf-row">
+              <button id="pick-pdf-btn" class="secondary-btn">Drive에서 PDF 선택/업로드</button>
+              <span id="pick-pdf-status" class="status-msg"></span>
+            </div>
+            <p id="parse-status" class="status-msg"></p>
+            <div id="parse-result" style="display:none;" class="parse-preview">
+              <div class="preview-header">
+                <span class="preview-title-text"></span>
+                <button id="index-btn" class="primary-btn" disabled>위키에 추가 →</button>
+              </div>
+              <pre class="preview-body"></pre>
+            </div>
           </div>
-        </section>
-      </main>
+        </div>
+
+      </div>
     </div>
   </div>
 
