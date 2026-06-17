@@ -68,13 +68,16 @@ function buildUrlParseParts_(url) {
   // Step 2 (in handleParse_): convert the text to structured JSON without tools.
   return [geminiTextPart_(
     'Fetch the content at the following URL and extract its main content as clean markdown. ' +
-    'Remove navigation, ads, and boilerplate. Output only the markdown text, no commentary.\n\nURL: ' + url
+    'Remove navigation, ads, and boilerplate. ' +
+    'IMPORTANT: Preserve the original language of the article exactly — do NOT translate. ' +
+    'Output only the markdown text, no commentary.\n\nURL: ' + url
   )];
 }
 
 function structureRawText_(rawText) {
   const prompt =
     'Convert the following content into a structured wiki entry. ' +
+    'IMPORTANT: Preserve the original language of the content exactly — do NOT translate. ' +
     'Respond with JSON matching the schema.\n\n---\n\n' + rawText;
   return geminiGenerate_([geminiTextPart_(prompt)], { jsonSchema: PARSE_RESPONSE_SCHEMA, action: 'parse' });
 }
@@ -85,6 +88,7 @@ function buildYoutubeParseParts_(url) {
     geminiTextPart_(
       'Watch this video and produce a clean markdown summary of its content, ' +
       'organized with headings and bullet points covering the key points and topics discussed. ' +
+      'Preserve the original language of the video — do NOT translate. ' +
       'Respond with JSON matching the schema.'
     )
   ];
