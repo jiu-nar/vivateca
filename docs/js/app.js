@@ -20,8 +20,11 @@
     askBtn:         $('ask-btn'),
     askStatus:      $('ask-status'),
     askAnswer:      $('ask-answer'),
-    askSources:     $('ask-sources'),
-    askSourcesWrap: $('ask-sources-wrap'),
+    askSources:          $('ask-sources'),
+    askSourcesWrap:      $('ask-sources-wrap'),
+    askHistoryWrap:      $('ask-history-wrap'),
+    askHistoryList:      $('ask-history-list'),
+    askHistoryClearAll:  $('ask-history-clear-all'),
 
     parsePdfRow:    $('parse-pdf-row'),
     pickPdfBtn:     $('pick-pdf-btn'),
@@ -305,6 +308,75 @@
     }
   });
 
+  // ── Ask History (localStorage) ──
+  const HISTORY_KEY = 'llmwiki_ask_history';
+  const HISTORY_MAX = 50;
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+  }
+
+  function saveHistory(items) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, HISTORY_MAX)));
+  }
+
+  function renderHistory() {
+    const items = loadHistory();
+    if (!items.length) { els.askHistoryWrap.style.display = 'none'; return; }
+    els.askHistoryWrap.style.display = 'block';
+    els.askHistoryList.innerHTML = '';
+    items.forEach((item, idx) => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      li.innerHTML =
+        '<div class="history-q">' +
+          '<button class="history-toggle" data-idx="' + idx + '">' + escHtml(item.question) + '</button>' +
+          '<button class="history-del" data-idx="' + idx + '" title="삭제">✕</button>' +
+        '</div>' +
+        '<div class="history-a" id="history-a-' + idx + '" style="display:none;">' +
+          '<div class="markdown-body">' + item.answerHtml + '</div>' +
+          (item.sources && item.sources.length
+            ? '<p class="sources-label">참고 페이지</p><ul class="history-sources">' +
+              item.sources.map(s => '<li><a href="#" data-path="' + escHtml(s.path) + '">' + escHtml(s.title) + '</a></li>').join('') +
+              '</ul>'
+            : '') +
+        '</div>';
+      els.askHistoryList.appendChild(li);
+    });
+
+    els.askHistoryList.querySelectorAll('.history-toggle').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const a = document.getElementById('history-a-' + this.dataset.idx);
+        const open = a.style.display !== 'none';
+        a.style.display = open ? 'none' : 'block';
+        this.classList.toggle('open', !open);
+      });
+    });
+
+    els.askHistoryList.querySelectorAll('.history-del').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const items = loadHistory();
+        items.splice(Number(this.dataset.idx), 1);
+        saveHistory(items);
+        renderHistory();
+      });
+    });
+
+    els.askHistoryList.querySelectorAll('.history-sources a').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const page = allPages.find(p => p.path === a.dataset.path);
+        if (page) openPage(page, null);
+      });
+    });
+  }
+
+  els.askHistoryClearAll.addEventListener('click', () => {
+    if (!confirm('질문 히스토리를 모두 삭제할까요?')) return;
+    saveHistory([]);
+    renderHistory();
+  });
+
   // ── Ask ──
   els.askBtn.addEventListener('click', async () => {
     const question = els.askInput.value.trim();
@@ -317,9 +389,10 @@
     try {
       const result = await LLMWikiApi.ask({ question });
       els.askAnswer.innerHTML = marked.parse(result.answer);
-      if (result.sources && result.sources.length) {
+      const sources = result.sources || [];
+      if (sources.length) {
         els.askSources.innerHTML = '';
-        result.sources.forEach(src => {
+        sources.forEach(src => {
           const li = document.createElement('li');
           const a = document.createElement('a');
           a.href = '#';
@@ -335,6 +408,12 @@
         els.askSourcesWrap.style.display = 'block';
       }
       setStatus(els.askStatus, '');
+
+      // save to history
+      const items = loadHistory();
+      items.unshift({ question, answerHtml: marked.parse(result.answer), sources, ts: Date.now() });
+      saveHistory(items);
+      renderHistory();
     } catch (err) {
       setStatus(els.askStatus, '오류: ' + err.message, 'error');
     }
@@ -343,6 +422,8 @@
   els.askInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) els.askBtn.click();
   });
+
+  renderHistory();
 
   // ── PDF Picker ──
   els.pickPdfBtn.addEventListener('click', openPdfPicker);

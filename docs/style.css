@@ -608,6 +608,98 @@ body {
   color: var(--sidebar-text);
 }
 
+/* ── Ask History ── */
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  margin-bottom: 8px;
+}
+
+.danger-text-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.danger-text-btn:hover { opacity: 1; }
+
+#ask-history-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+
+.history-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.history-q {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px 0;
+}
+
+.history-toggle {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.4;
+  transition: color 0.15s;
+}
+
+.history-toggle:hover { color: var(--accent); }
+.history-toggle.open { color: var(--accent); font-weight: 500; }
+
+.history-del {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.history-del:hover { color: var(--danger); background: #fef2f2; }
+
+.history-a {
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 14px;
+}
+
+.history-sources { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+.history-sources li a {
+  display: inline-block;
+  background: #ede9fe;
+  color: var(--accent-dark);
+  text-decoration: none;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.history-sources li a:hover { background: #ddd6fe; }
+
 /* ── Delete Button ── */
 .delete-btn {
   background: none;
