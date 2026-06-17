@@ -45,6 +45,7 @@ window.LLMWikiApi = (function () {
     getPage: function (pageId) { return get('getPage', { pageId: pageId }); },
     parse: function (payload) { return call('parse', payload); },
     index: function (payload) { return call('index', payload); },
-    ask: function (payload) { return call('ask', payload); }
+    ask: function (payload) { return call('ask', payload); },
+    deletePage: function (payload) { return call('delete', payload); }
   };
 })();

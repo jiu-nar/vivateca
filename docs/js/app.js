@@ -12,6 +12,7 @@
 
     tabAskBtn:      $('tab-ask-btn'),
     tabAddBtn:      $('tab-add-btn'),
+    deletePageBtn:  $('delete-page-btn'),
     drawerAsk:      $('drawer-ask'),
     drawerAdd:      $('drawer-add'),
 
@@ -37,9 +38,10 @@
   let pickedPdfFileId = null;
   let currentType = 'url';
   let activePageEl = null;
+  let currentPageObj = null;
 
-  // filter state
-  const filter = { q: '', type: '', tag: '' };
+  // filter state — search covers title + tags + summary
+  const filter = { q: '', type: '' };
   const PAGE_SIZE = 15;
   let currentPage = 0;
 
@@ -85,7 +87,6 @@
     try {
       const data = await LLMWikiApi.listPages();
       allPages = data.pages || [];
-      buildTagFilter();
       renderFiltered();
     } catch (err) {
       els.pageList.innerHTML = '<li><span class="error-msg">' + escHtml(err.message) + '</span></li>';
@@ -124,8 +125,8 @@
     const q = filter.q.toLowerCase();
     const filtered = allPages.filter(p => {
       if (filter.type && p.type !== filter.type) return false;
-      if (filter.tag && !(p.tags || []).includes(filter.tag)) return false;
-      if (q && !p.title.toLowerCase().includes(q) && !(p.tags || []).some(t => t.toLowerCase().includes(q))) return false;
+      // search: title + tags + summary
+      if (q && ![p.title, p.summary, ...(p.tags || [])].some(s => s && s.toLowerCase().includes(q))) return false;
       return true;
     }).sort((a, b) => a.title.localeCompare(b.title));
 
@@ -149,23 +150,6 @@
     $('pg-next').addEventListener('click', () => { currentPage++; renderFiltered(); });
   }
 
-  function buildTagFilter() {
-    const tagCount = {};
-    allPages.forEach(p => (p.tags || []).forEach(t => { tagCount[t] = (tagCount[t] || 0) + 1; }));
-    const tags = Object.keys(tagCount).sort();
-    const el = $('tag-filter');
-    if (!tags.length) { el.innerHTML = ''; return; }
-    el.innerHTML = tags.map(t =>
-      '<button class="tag-chip' + (filter.tag === t ? ' active' : '') + '" data-tag="' + escHtml(t) + '">' + escHtml(t) + '</button>'
-    ).join('');
-    el.querySelectorAll('.tag-chip').forEach(btn => {
-      btn.addEventListener('click', function () {
-        filter.tag = filter.tag === this.dataset.tag ? '' : this.dataset.tag;
-        el.querySelectorAll('.tag-chip').forEach(b => b.classList.toggle('active', b.dataset.tag === filter.tag));
-        applyFilters();
-      });
-    });
-  }
 
   // Type filter
   $('type-filter').querySelectorAll('.tf-btn').forEach(btn => {
@@ -189,27 +173,61 @@
     activePageEl = linkEl;
     if (linkEl) linkEl.classList.add('active');
 
+    currentPageObj = page;
     els.pageTitle.textContent = page.title;
+    els.deletePageBtn.style.display = 'inline-flex';
     els.pageContent.innerHTML = '<p style="color:var(--text-muted);font-size:14px;">로딩 중…</p>';
 
     try {
       const data = await LLMWikiApi.getPage(page.id);
-      const content = stripFrontmatter(data.content);
-      let html = '';
-      if (page.type) {
-        html += '<span class="fm-badge">' + escHtml(page.type) + '</span>';
-      }
-      html += marked.parse(content);
-      els.pageContent.innerHTML = html;
+      const { fm, body } = parseFrontmatter(data.content);
+      els.pageContent.innerHTML = renderFmCard(fm) + marked.parse(body);
     } catch (err) {
       els.pageContent.innerHTML = '<p style="color:var(--danger)">' + escHtml(err.message) + '</p>';
     }
   }
 
-  function stripFrontmatter(text) {
-    if (!text.startsWith('---')) return text;
-    const end = text.indexOf('\n---', 3);
-    return end !== -1 ? text.slice(end + 4).trimStart() : text;
+  function parseFrontmatter(text) {
+    if (!text.startsWith('---\n')) return { fm: {}, body: text };
+    const end = text.indexOf('\n---\n', 4);
+    if (end === -1) return { fm: {}, body: text };
+    const raw = text.slice(4, end);
+    const body = text.slice(end + 5);
+    const fm = {};
+    raw.split('\n').forEach(line => {
+      const colon = line.indexOf(': ');
+      if (colon === -1) return;
+      const k = line.slice(0, colon).trim();
+      let v = line.slice(colon + 2).trim();
+      // parse YAML array like ["a", "b"]
+      if (v.startsWith('[')) {
+        try { fm[k] = JSON.parse(v); } catch { fm[k] = v; }
+      } else {
+        fm[k] = v;
+      }
+    });
+    return { fm, body };
+  }
+
+  function renderFmCard(fm) {
+    if (!Object.keys(fm).length) return '';
+    const typeEmoji = typeToEmoji(fm.type);
+    const tags = Array.isArray(fm.tags) ? fm.tags : [];
+    const ts = fm.timestamp ? new Date(fm.timestamp).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    let html = '<div class="fm-card">';
+    html += '<div class="fm-card-top">';
+    if (fm.type) html += '<span class="fm-type-badge">' + typeEmoji + ' ' + escHtml(fm.type) + '</span>';
+    if (ts) html += '<span class="fm-timestamp">' + escHtml(ts) + '</span>';
+    html += '</div>';
+    if (fm.description) html += '<p class="fm-description">' + escHtml(fm.description) + '</p>';
+    if (tags.length) {
+      html += '<div class="fm-tags">' + tags.map(t => '<span class="fm-tag">' + escHtml(t) + '</span>').join('') + '</div>';
+    }
+    if (fm.source) {
+      html += '<a class="fm-source" href="' + escHtml(fm.source) + '" target="_blank" rel="noopener">📎 원본 소스</a>';
+    }
+    html += '</div>';
+    return html;
   }
 
   // ── Type Tabs ──
@@ -277,7 +295,7 @@
       pendingRawId = null;
       pickedPdfFileId = null;
       els.pickPdfStatus.textContent = '';
-      filter.type = ''; filter.tag = ''; filter.q = '';
+      filter.type = ''; filter.q = '';
       $('type-filter').querySelectorAll('.tf-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
       els.pageSearch.value = '';
       refreshPageList();
@@ -366,6 +384,28 @@
   function typeToEmoji(type) {
     return { Concept: '💡', Summary: '📝', 'How-to': '🔧', Reference: '📌', Note: '🗒️' }[type] || '📄';
   }
+
+  // ── Delete Page ──
+  els.deletePageBtn.addEventListener('click', async () => {
+    if (!currentPageObj) return;
+    const title = currentPageObj.title || currentPageObj.id;
+    if (!confirm('「' + title + '」 페이지를 삭제할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
+
+    els.deletePageBtn.disabled = true;
+    try {
+      await LLMWikiApi.deletePage({ pageId: currentPageObj.id });
+      els.pageTitle.textContent = '페이지를 선택하세요';
+      els.pageContent.innerHTML = '';
+      els.deletePageBtn.style.display = 'none';
+      currentPageObj = null;
+      activePageEl = null;
+      refreshPageList();
+    } catch (err) {
+      alert('삭제 오류: ' + err.message);
+    } finally {
+      els.deletePageBtn.disabled = false;
+    }
+  });
 
   LLMWikiAuth.init(onSignIn);
 })();

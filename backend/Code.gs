@@ -43,6 +43,8 @@ function doPost(e) {
         return jsonResponse_(handleIndex_(req.payload || {}));
       case 'ask':
         return jsonResponse_(handleAsk_(req.payload || {}));
+      case 'delete':
+        return jsonResponse_(handleDelete_(req.payload || {}));
       default:
         throw new Error('Unknown action: ' + req.action);
     }
