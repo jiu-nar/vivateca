@@ -38,6 +38,11 @@
   let currentType = 'url';
   let activePageEl = null;
 
+  // filter state
+  const filter = { q: '', type: '', tag: '' };
+  const PAGE_SIZE = 15;
+  let currentPage = 0;
+
   // ── Auth ──
   function onSignIn() {
     els.signedOut.style.display = 'none';
@@ -80,7 +85,8 @@
     try {
       const data = await LLMWikiApi.listPages();
       allPages = data.pages || [];
-      renderPageList(allPages);
+      buildTagFilter();
+      renderFiltered();
     } catch (err) {
       els.pageList.innerHTML = '<li><span class="error-msg">' + escHtml(err.message) + '</span></li>';
     }
@@ -108,13 +114,73 @@
       });
   }
 
+  // ── Filtering & Pagination ──
+  function applyFilters() {
+    currentPage = 0;
+    renderFiltered();
+  }
+
+  function renderFiltered() {
+    const q = filter.q.toLowerCase();
+    const filtered = allPages.filter(p => {
+      if (filter.type && p.type !== filter.type) return false;
+      if (filter.tag && !(p.tags || []).includes(filter.tag)) return false;
+      if (q && !p.title.toLowerCase().includes(q) && !(p.tags || []).some(t => t.toLowerCase().includes(q))) return false;
+      return true;
+    }).sort((a, b) => a.title.localeCompare(b.title));
+
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+    currentPage = Math.min(currentPage, totalPages - 1);
+    const slice = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+    renderPageList(slice);
+    renderPagination(currentPage, totalPages, total);
+  }
+
+  function renderPagination(page, totalPages, total) {
+    const el = $('pagination');
+    if (totalPages <= 1) { el.innerHTML = ''; return; }
+    el.innerHTML =
+      '<button class="pg-btn" ' + (page === 0 ? 'disabled' : '') + ' id="pg-prev">‹</button>' +
+      '<span class="pg-info">' + (page + 1) + ' / ' + totalPages + '</span>' +
+      '<button class="pg-btn" ' + (page >= totalPages - 1 ? 'disabled' : '') + ' id="pg-next">›</button>';
+    $('pg-prev').addEventListener('click', () => { currentPage--; renderFiltered(); });
+    $('pg-next').addEventListener('click', () => { currentPage++; renderFiltered(); });
+  }
+
+  function buildTagFilter() {
+    const tagCount = {};
+    allPages.forEach(p => (p.tags || []).forEach(t => { tagCount[t] = (tagCount[t] || 0) + 1; }));
+    const tags = Object.keys(tagCount).sort();
+    const el = $('tag-filter');
+    if (!tags.length) { el.innerHTML = ''; return; }
+    el.innerHTML = tags.map(t =>
+      '<button class="tag-chip' + (filter.tag === t ? ' active' : '') + '" data-tag="' + escHtml(t) + '">' + escHtml(t) + '</button>'
+    ).join('');
+    el.querySelectorAll('.tag-chip').forEach(btn => {
+      btn.addEventListener('click', function () {
+        filter.tag = filter.tag === this.dataset.tag ? '' : this.dataset.tag;
+        el.querySelectorAll('.tag-chip').forEach(b => b.classList.toggle('active', b.dataset.tag === filter.tag));
+        applyFilters();
+      });
+    });
+  }
+
+  // Type filter
+  $('type-filter').querySelectorAll('.tf-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      $('type-filter').querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      filter.type = this.dataset.type;
+      applyFilters();
+    });
+  });
+
   // ── Search ──
   els.pageSearch.addEventListener('input', function () {
-    const q = this.value.trim().toLowerCase();
-    const filtered = q
-      ? allPages.filter(p => p.title.toLowerCase().includes(q) || (p.tags || []).some(t => t.toLowerCase().includes(q)))
-      : allPages;
-    renderPageList(filtered);
+    filter.q = this.value.trim();
+    applyFilters();
   });
 
   // ── Page View ──
@@ -211,6 +277,9 @@
       pendingRawId = null;
       pickedPdfFileId = null;
       els.pickPdfStatus.textContent = '';
+      filter.type = ''; filter.tag = ''; filter.q = '';
+      $('type-filter').querySelectorAll('.tf-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+      els.pageSearch.value = '';
       refreshPageList();
     } catch (err) {
       setStatus(els.parseStatus, '오류: ' + err.message, 'error');

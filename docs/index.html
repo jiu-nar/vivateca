@@ -36,8 +36,20 @@
         <div class="sidebar-search">
           <input type="text" id="page-search" placeholder="페이지 검색…" />
         </div>
+        <div class="sidebar-filters">
+          <div class="type-filter" id="type-filter">
+            <button class="tf-btn active" data-type="">전체</button>
+            <button class="tf-btn" data-type="Concept">💡</button>
+            <button class="tf-btn" data-type="Summary">📝</button>
+            <button class="tf-btn" data-type="How-to">🔧</button>
+            <button class="tf-btn" data-type="Reference">📌</button>
+            <button class="tf-btn" data-type="Note">🗒️</button>
+          </div>
+          <div class="tag-filter" id="tag-filter"></div>
+        </div>
         <nav class="page-nav">
           <ul id="page-list"></ul>
+          <div class="pagination" id="pagination"></div>
         </nav>
       </aside>
 
