@@ -41,12 +41,15 @@ function handleParse_(input) {
       throw new Error('Unknown parse type: ' + type);
   }
 
-  const options = { jsonSchema: PARSE_RESPONSE_SCHEMA, action: 'parse' };
+  let resultText;
   if (type === 'url') {
-    options.tools = [geminiUrlContextTool_()];
+    // Step 1: fetch page content with url_context (no JSON mode — incompatible)
+    const rawText = geminiGenerate_(parts, { tools: [geminiUrlContextTool_()], action: 'parse' });
+    // Step 2: structure the extracted text as JSON
+    resultText = structureRawText_(rawText);
+  } else {
+    resultText = geminiGenerate_(parts, { jsonSchema: PARSE_RESPONSE_SCHEMA, action: 'parse' });
   }
-
-  const resultText = geminiGenerate_(parts, options);
   const result = JSON.parse(resultText);
 
   const rawFolder = getRawFolder_();
@@ -60,11 +63,20 @@ function handleParse_(input) {
 }
 
 function buildUrlParseParts_(url) {
+  // url_context tool cannot be combined with JSON response mode.
+  // Step 1: fetch and extract content as plain text using url_context.
+  // Step 2 (in handleParse_): convert the text to structured JSON without tools.
   return [geminiTextPart_(
-    'Fetch the content at the following URL and convert its main content into clean, ' +
-    'well-structured markdown. Remove navigation, ads, and boilerplate. ' +
-    'Respond with JSON matching the schema.\n\nURL: ' + url
+    'Fetch the content at the following URL and extract its main content as clean markdown. ' +
+    'Remove navigation, ads, and boilerplate. Output only the markdown text, no commentary.\n\nURL: ' + url
   )];
+}
+
+function structureRawText_(rawText) {
+  const prompt =
+    'Convert the following content into a structured wiki entry. ' +
+    'Respond with JSON matching the schema.\n\n---\n\n' + rawText;
+  return geminiGenerate_([geminiTextPart_(prompt)], { jsonSchema: PARSE_RESPONSE_SCHEMA, action: 'parse' });
 }
 
 function buildYoutubeParseParts_(url) {
