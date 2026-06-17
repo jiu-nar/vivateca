@@ -1,0 +1,166 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  color: #222;
+  background: #fafafa;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.centered {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.layout {
+  display: flex;
+  min-height: calc(100vh - 57px);
+}
+
+#sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid #e0e0e0;
+  padding: 16px;
+  background: #fff;
+  overflow-y: auto;
+}
+
+#sidebar h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  color: #888;
+  margin-top: 0;
+}
+
+#page-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#page-list li {
+  margin-bottom: 6px;
+}
+
+#page-list a {
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+#page-list a:hover {
+  text-decoration: underline;
+}
+
+#main {
+  flex: 1;
+  padding: 20px 32px;
+  max-width: 800px;
+}
+
+.panel {
+  margin-top: 32px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.panel h3 {
+  margin-top: 0;
+}
+
+.panel textarea,
+.panel select {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background: #1a73e8;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:disabled {
+  background: #aac4ed;
+  cursor: not-allowed;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.status {
+  font-size: 13px;
+  color: #666;
+  min-height: 18px;
+}
+
+.status.error {
+  color: #d33;
+}
+
+.muted {
+  color: #999;
+}
+
+.error {
+  color: #d33;
+}
+
+.preview {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.preview-body {
+  white-space: pre-wrap;
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.markdown-body {
+  line-height: 1.6;
+}
+
+.markdown-body img {
+  max-width: 100%;
+}
+
+#ask-sources {
+  padding-left: 20px;
+}

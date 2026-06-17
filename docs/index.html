@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM Wiki</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>LLM Wiki</h1>
+    <div id="google-signin-button"></div>
+  </header>
+
+  <div id="signed-out" class="centered">
+    <p>로그인하여 위키에 접근하세요.</p>
+  </div>
+
+  <div id="signed-in" style="display: none;">
+    <div class="layout">
+      <aside id="sidebar">
+        <h2>페이지</h2>
+        <ul id="page-list"></ul>
+      </aside>
+
+      <main id="main">
+        <section id="page-view">
+          <h2 id="page-title">페이지를 선택하세요</h2>
+          <div id="page-content" class="markdown-body"></div>
+        </section>
+
+        <section id="ask-panel" class="panel">
+          <h3>질문하기</h3>
+          <textarea id="ask-input" rows="2" placeholder="위키 내용에 대해 질문하세요"></textarea>
+          <button id="ask-btn">질문</button>
+          <p id="ask-status" class="status"></p>
+          <div id="ask-answer" class="markdown-body"></div>
+          <ul id="ask-sources"></ul>
+        </section>
+
+        <section id="parse-panel" class="panel">
+          <h3>콘텐츠 추가</h3>
+          <select id="parse-type">
+            <option value="url">웹페이지 링크</option>
+            <option value="youtube">YouTube 링크</option>
+            <option value="text">텍스트 / 마크다운</option>
+            <option value="pdf">PDF 파일</option>
+          </select>
+          <textarea id="parse-input" rows="3" placeholder="웹페이지 URL을 입력하세요"></textarea>
+          <div id="parse-pdf-row" style="display: none;" class="row">
+            <button id="pick-pdf-btn">Drive에서 PDF 선택/업로드</button>
+            <span id="pick-pdf-status" class="status"></span>
+          </div>
+          <button id="parse-btn">파싱</button>
+          <p id="parse-status" class="status"></p>
+          <div id="parse-result" style="display: none;" class="preview">
+            <h4 class="preview-title"></h4>
+            <pre class="preview-body"></pre>
+            <button id="index-btn" disabled>위키에 추가</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
